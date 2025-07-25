@@ -1,0 +1,905 @@
+openapi: 3.1.0
+info:
+  title: AI Stock Analysis API
+  description: A microservice for AI-powered stock and cryptocurrency analysis using yfinance and GPT-4o-mini
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000
+    description: Development server
+  - url: https://api.stockanalysis.com
+    description: Production server
+
+tags:
+  - name: stocks
+    description: Stock and cryptocurrency data operations
+  - name: analysis
+    description: AI-powered analysis and recommendations
+  - name: health
+    description: Health check endpoints
+
+paths:
+  /:
+    get:
+      summary: Root
+      description: Root endpoint with API information.
+      operationId: root
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  version:
+                    type: string
+                  description:
+                    type: string
+                  endpoints:
+                    type: object
+                  supported_markets:
+                    type: array
+                    items:
+                      type: string
+                  features:
+                    type: array
+                    items:
+                      type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /health:
+    get:
+      tags:
+        - health
+      summary: Health Check
+      description: Health check endpoint.
+      operationId: health_check
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, unhealthy]
+                  timestamp:
+                    type: string
+                    format: date-time
+                  services:
+                    type: object
+                    properties:
+                      api:
+                        type: string
+                      cache:
+                        type: string
+                      openai:
+                        type: string
+                  version:
+                    type: string
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+                  error:
+                    type: string
+
+  /api/v1/stocks/{symbol}:
+    get:
+      tags:
+        - stocks
+      summary: Get Stock
+      description: Get individual stock/crypto data with historical prices and technical indicators.
+      operationId: get_stock
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Stock symbol (e.g., AAPL, BTC-USD, NPN.JO)
+          example: AAPL
+        - name: market
+          in: query
+          required: false
+          schema:
+            type: string
+            default: US
+            enum: [US, ZA, CRYPTO]
+          description: Market type
+          example: US
+        - name: period
+          in: query
+          required: false
+          schema:
+            type: string
+            default: 1mo
+            enum: [1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max]
+          description: Time period for historical data
+          example: 1mo
+        - name: interval
+          in: query
+          required: false
+          schema:
+            type: string
+            default: 1d
+            enum: [1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo]
+          description: Data interval
+          example: 1d
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockData'
+        '404':
+          description: Stock Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+
+  /api/v1/stocks/search:
+    get:
+      tags:
+        - stocks
+      summary: Search Stocks
+      description: Search for stocks/crypto by name or ticker symbol.
+      operationId: search_stocks
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+          description: Search query (company name or ticker)
+          example: apple
+        - name: market
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ALL
+            enum: [US, ZA, CRYPTO, ALL]
+          description: Market filter
+          example: ALL
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+          description: Maximum number of results
+          example: 10
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockSearchResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+
+  /api/v1/stocks/batch:
+    post:
+      tags:
+        - stocks
+      summary: Get Batch Stocks
+      description: Fetch multiple stocks in one request.
+      operationId: get_batch_stocks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchStockRequest'
+            example:
+              symbols: ["AAPL", "MSFT", "GOOGL"]
+              period: "1mo"
+              interval: "1d"
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchStockResponse'
+        '404':
+          description: No Stocks Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+
+  /api/v1/stocks/markets/status:
+    get:
+      tags:
+        - stocks
+      summary: Get Market Status
+      description: Get current market status for different exchanges.
+      operationId: get_market_status
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  timestamp:
+                    type: string
+                    format: date-time
+                  markets:
+                    type: object
+                    properties:
+                      US:
+                        $ref: '#/components/schemas/MarketStatus'
+                      ZA:
+                        $ref: '#/components/schemas/MarketStatus'
+                      CRYPTO:
+                        $ref: '#/components/schemas/MarketStatus'
+
+  /api/v1/analysis/{symbol}:
+    get:
+      tags:
+        - analysis
+      summary: Get Stock Analysis
+      description: Get AI-powered analysis for a stock/crypto with BUY/HOLD/SELL recommendation.
+      operationId: get_stock_analysis
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Stock symbol
+          example: AAPL
+        - name: market
+          in: query
+          required: false
+          schema:
+            type: string
+            default: US
+            enum: [US, ZA, CRYPTO]
+          description: Market type
+          example: US
+        - name: analysis_type
+          in: query
+          required: false
+          schema:
+            type: string
+            default: comprehensive
+            enum: [technical, fundamental, sentiment, comprehensive]
+          description: Analysis type
+          example: comprehensive
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockAnalysis'
+        '404':
+          description: Stock Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+
+  /api/v1/analysis/compare:
+    post:
+      tags:
+        - analysis
+      summary: Compare Stocks
+      description: Compare two or more stocks and provide investment recommendation.
+      operationId: compare_stocks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompareRequest'
+            example:
+              symbols: ["AAPL", "MSFT", "GOOGL"]
+              metrics: ["performance", "valuation"]
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComparisonResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+
+  /api/v1/analysis/portfolio:
+    post:
+      tags:
+        - analysis
+      summary: Analyze Portfolio
+      description: Analyze a portfolio of holdings and provide recommendations.
+      operationId: analyze_portfolio
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PortfolioRequest'
+            example:
+              holdings:
+                - symbol: "AAPL"
+                  quantity: 100
+                  purchase_price: 140.00
+                - symbol: "MSFT"
+                  quantity: 50
+                  purchase_price: 250.00
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortfolioAnalysis'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+
+  /api/v1/analysis/health:
+    get:
+      tags:
+        - analysis
+      summary: Analysis Health Check
+      description: Health check endpoint for analysis service.
+      operationId: analysis_health_check
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, unhealthy]
+                  service:
+                    type: string
+                  openai_configured:
+                    type: boolean
+                  cache_available:
+                    type: boolean
+                  timestamp:
+                    type: string
+                    format: date-time
+
+components:
+  schemas:
+    StockData:
+      type: object
+      required:
+        - symbol
+        - market
+        - company_name
+        - current_price
+        - currency
+        - change_percent
+        - volume
+        - historical_data
+        - technical_indicators
+      properties:
+        symbol:
+          type: string
+          description: Stock ticker symbol
+          example: AAPL
+        market:
+          type: string
+          enum: [US, ZA, CRYPTO]
+          description: Market type
+        company_name:
+          type: string
+          description: Company name
+          example: Apple Inc.
+        current_price:
+          type: number
+          description: Current stock price
+          example: 150.25
+        currency:
+          type: string
+          description: Currency code
+          example: USD
+        change_percent:
+          type: number
+          description: Daily change percentage
+          example: 2.5
+        volume:
+          type: integer
+          description: Trading volume
+          example: 75000000
+        market_cap:
+          type: number
+          nullable: true
+          description: Market capitalization
+        pe_ratio:
+          type: number
+          nullable: true
+          description: Price-to-earnings ratio
+        dividend_yield:
+          type: number
+          nullable: true
+          description: Dividend yield percentage
+        historical_data:
+          type: array
+          items:
+            $ref: '#/components/schemas/HistoricalDataPoint'
+        technical_indicators:
+          $ref: '#/components/schemas/TechnicalIndicators'
+        fifty_two_week_high:
+          type: number
+          nullable: true
+          description: 52-week high price
+        fifty_two_week_low:
+          type: number
+          nullable: true
+          description: 52-week low price
+        average_volume:
+          type: integer
+          nullable: true
+          description: Average trading volume
+        price_changes:
+          type: object
+          description: Price changes over different periods
+
+    HistoricalDataPoint:
+      type: object
+      required:
+        - timestamp
+        - open
+        - high
+        - low
+        - close
+        - volume
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        open:
+          type: number
+        high:
+          type: number
+        low:
+          type: number
+        close:
+          type: number
+        volume:
+          type: integer
+
+    TechnicalIndicators:
+      type: object
+      properties:
+        rsi:
+          type: number
+          nullable: true
+          description: 14-period RSI
+        sma_20:
+          type: number
+          nullable: true
+          description: 20-day Simple Moving Average
+        sma_50:
+          type: number
+          nullable: true
+          description: 50-day Simple Moving Average
+        sma_200:
+          type: number
+          nullable: true
+          description: 200-day Simple Moving Average
+        macd:
+          type: number
+          nullable: true
+          description: MACD line
+        macd_signal:
+          type: number
+          nullable: true
+          description: MACD signal line
+        macd_histogram:
+          type: number
+          nullable: true
+          description: MACD histogram
+
+    StockSearchResponse:
+      type: object
+      required:
+        - results
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockSearchResult'
+
+    StockSearchResult:
+      type: object
+      required:
+        - symbol
+        - name
+        - market
+      properties:
+        symbol:
+          type: string
+        name:
+          type: string
+        market:
+          type: string
+          enum: [US, ZA, CRYPTO]
+        sector:
+          type: string
+          nullable: true
+
+    BatchStockRequest:
+      type: object
+      required:
+        - symbols
+      properties:
+        symbols:
+          type: array
+          items:
+            type: string
+          maxItems: 10
+          minItems: 1
+        period:
+          type: string
+          default: 1mo
+        interval:
+          type: string
+          default: 1d
+
+    BatchStockResponse:
+      type: object
+      required:
+        - stocks
+      properties:
+        stocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockData'
+
+    MarketStatus:
+      type: object
+      properties:
+        is_open:
+          type: boolean
+        local_time:
+          type: string
+        next_open:
+          type: string
+          nullable: true
+        note:
+          type: string
+          nullable: true
+
+    StockAnalysis:
+      type: object
+      required:
+        - symbol
+        - market
+        - timestamp
+        - recommendation
+        - confidence_score
+        - target_price
+        - analysis_summary
+        - key_points
+        - price_targets
+      properties:
+        symbol:
+          type: string
+        market:
+          type: string
+          enum: [US, ZA, CRYPTO]
+        timestamp:
+          type: string
+          format: date-time
+        recommendation:
+          type: string
+          enum: [BUY, HOLD, SELL]
+        confidence_score:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+        target_price:
+          type: number
+        analysis_summary:
+          type: string
+        key_points:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnalysisPoint'
+        price_targets:
+          $ref: '#/components/schemas/PriceTargets'
+        risks:
+          type: array
+          items:
+            type: string
+        opportunities:
+          type: array
+          items:
+            type: string
+
+    AnalysisPoint:
+      type: object
+      required:
+        - category
+        - point
+        - sentiment
+      properties:
+        category:
+          type: string
+          enum: [technical, fundamental, market, risk]
+        point:
+          type: string
+          maxLength: 200
+        sentiment:
+          type: string
+          enum: [positive, negative, neutral]
+
+    PriceTargets:
+      type: object
+      required:
+        - bearish
+        - neutral
+        - bullish
+      properties:
+        bearish:
+          type: number
+          exclusiveMinimum: 0.0
+        neutral:
+          type: number
+          exclusiveMinimum: 0.0
+        bullish:
+          type: number
+          exclusiveMinimum: 0.0
+
+    CompareRequest:
+      type: object
+      required:
+        - symbols
+      properties:
+        symbols:
+          type: array
+          items:
+            type: string
+          minItems: 2
+          maxItems: 5
+        metrics:
+          type: array
+          items:
+            type: string
+            enum: [performance, valuation, growth, risk]
+          default: [performance, valuation]
+
+    ComparisonResponse:
+      type: object
+      required:
+        - comparison
+        - winner
+        - reasoning
+        - timestamp
+      properties:
+        comparison:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComparisonResult'
+        winner:
+          type: string
+        reasoning:
+          type: array
+          items:
+            type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    ComparisonResult:
+      type: object
+      required:
+        - symbol
+        - score
+        - strengths
+        - weaknesses
+      properties:
+        symbol:
+          type: string
+        score:
+          type: number
+          minimum: 0.0
+          maximum: 10.0
+        strengths:
+          type: array
+          items:
+            type: string
+        weaknesses:
+          type: array
+          items:
+            type: string
+
+    PortfolioRequest:
+      type: object
+      required:
+        - holdings
+      properties:
+        holdings:
+          type: array
+          items:
+            $ref: '#/components/schemas/PortfolioHolding'
+          minItems: 1
+
+    PortfolioHolding:
+      type: object
+      required:
+        - symbol
+        - quantity
+        - purchase_price
+      properties:
+        symbol:
+          type: string
+        quantity:
+          type: number
+          exclusiveMinimum: 0.0
+        purchase_price:
+          type: number
+          exclusiveMinimum: 0.0
+
+    PortfolioAnalysis:
+      type: object
+      required:
+        - total_value
+        - total_gain_loss
+        - gain_loss_percent
+        - recommendations
+        - rebalancing_suggestions
+        - risk_assessment
+        - timestamp
+      properties:
+        total_value:
+          type: number
+        total_gain_loss:
+          type: number
+        gain_loss_percent:
+          type: number
+        recommendations:
+          type: array
+          items:
+            type: string
+        rebalancing_suggestions:
+          type: array
+          items:
+            type: string
+        risk_assessment:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: object
+          properties:
+            error:
+              type: object
+              properties:
+                code:
+                  type: string
+                message:
+                  type: string
+                details:
+                  type: object
+        timestamp:
+          type: string
+          format: date-time
+
+    HTTPValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationError'
+
+    ValidationError:
+      type: object
+      required:
+        - loc
+        - msg
+        - type
+      properties:
+        loc:
+          type: array
+          items:
+            anyOf:
+              - type: string
+              - type: integer
+        msg:
+          type: string
+        type:
+          type: string
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Optional API key for rate limiting and access control
+
+security:
+  - ApiKeyAuth: []
+  - {}  # Allow access without API key
+
+externalDocs:
+  description: Find more info here
+  url: https://github.com/your-repo/trader-agent

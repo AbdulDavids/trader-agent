@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Stock Analysis - Test Frontend</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #000;
+            color: #fff;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #4CAF50;
+            font-size: 2.5rem;
+        }
+
+        .api-section {
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .api-section h2 {
+            color: #4CAF50;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #ccc;
+            font-weight: 500;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            background: #222;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        input::placeholder {
+            color: #888;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+        }
+
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background: #45a049;
+        }
+
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+
+        .result-box {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .result-box pre {
+            white-space: pre-wrap;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 12px;
+            color: #e0e0e0;
+        }
+
+        .loading {
+            color: #4CAF50;
+            font-style: italic;
+        }
+
+        .error {
+            color: #f44336;
+        }
+
+        .success {
+            color: #4CAF50;
+        }
+
+        .flex-row {
+            display: flex;
+            gap: 15px;
+            align-items: end;
+        }
+
+        .flex-row .form-group {
+            flex: 1;
+        }
+
+        .recommendation {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .recommendation.buy {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .recommendation.hold {
+            background: #FF9800;
+            color: white;
+        }
+
+        .recommendation.sell {
+            background: #f44336;
+            color: white;
+        }
+
+        .api-status {
+            text-align: center;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .api-status.online {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4CAF50;
+        }
+
+        .api-status.offline {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 AI Stock Analysis API - Test Frontend</h1>
+        
+        <div id="api-status" class="api-status">
+            Checking API status...
+        </div>
+
+        <!-- Health Check Section -->
+        <div class="api-section">
+            <h2>🔍 API Health Check</h2>
+            <div class="flex-row">
+                <div class="form-group">
+                    <button onclick="checkHealth()">Check API Health</button>
+                </div>
+                <div class="form-group">
+                    <button onclick="clearCache()" style="background: #ff6b35;">Clear Analysis Cache</button>
+                </div>
+            </div>
+            <div id="health-result" class="result-box" style="display: none;"></div>
+        </div>
+
+        <!-- Stock Search Section -->
+        <div class="api-section">
+            <h2>📊 Stock Search</h2>
+            <div class="flex-row">
+                <div class="form-group">
+                    <label for="search-query">Search Query:</label>
+                    <input type="text" id="search-query" placeholder="e.g., AAPL, Tesla, Bitcoin">
+                </div>
+                <div class="form-group">
+                    <label for="search-market">Market:</label>
+                    <select id="search-market">
+                        <option value="ALL">All Markets</option>
+                        <option value="US">US</option>
+                        <option value="ZA">South Africa</option>
+                        <option value="CRYPTO">Crypto</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button onclick="searchStocks()">Search</button>
+                </div>
+            </div>
+            <div id="search-result" class="result-box" style="display: none;"></div>
+        </div>
+
+        <!-- Stock Data Section -->
+        <div class="api-section">
+            <h2>📈 Get Stock Data</h2>
+            <div class="flex-row">
+                <div class="form-group">
+                    <label for="stock-symbol">Symbol:</label>
+                    <input type="text" id="stock-symbol" placeholder="e.g., AAPL, BTC-USD">
+                </div>
+                <div class="form-group">
+                    <label for="stock-market">Market:</label>
+                    <select id="stock-market">
+                        <option value="US">US</option>
+                        <option value="ZA">South Africa</option>
+                        <option value="CRYPTO">Crypto</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="stock-period">Period:</label>
+                    <select id="stock-period">
+                        <option value="1d">1 Day</option>
+                        <option value="5d">5 Days</option>
+                        <option value="1mo" selected>1 Month</option>
+                        <option value="3mo">3 Months</option>
+                        <option value="6mo">6 Months</option>
+                        <option value="1y">1 Year</option>
+                        <option value="2y">2 Years</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button onclick="getStockData()">Get Data</button>
+                </div>
+            </div>
+            <div id="stock-result" class="result-box" style="display: none;"></div>
+        </div>
+
+        <!-- AI Analysis Section -->
+        <div class="api-section">
+            <h2>🤖 AI Stock Analysis</h2>
+            <div class="flex-row">
+                <div class="form-group">
+                    <label for="analysis-symbol">Symbol:</label>
+                    <input type="text" id="analysis-symbol" placeholder="e.g., AAPL, TSLA">
+                </div>
+                <div class="form-group">
+                    <label for="analysis-market">Market:</label>
+                    <select id="analysis-market">
+                        <option value="US">US</option>
+                        <option value="ZA">South Africa</option>
+                        <option value="CRYPTO">Crypto</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="analysis-type">Analysis Type:</label>
+                    <select id="analysis-type">
+                        <option value="comprehensive" selected>Comprehensive</option>
+                        <option value="technical">Technical</option>
+                        <option value="fundamental">Fundamental</option>
+                        <option value="sentiment">Sentiment</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button onclick="getAnalysis()">Analyze</button>
+                </div>
+            </div>
+            <div id="analysis-result" class="result-box" style="display: none;"></div>
+        </div>
+
+        <!-- Stock Comparison Section -->
+        <div class="api-section">
+            <h2>⚖️ Compare Stocks</h2>
+            <div class="form-group">
+                <label for="compare-symbols">Symbols (comma-separated):</label>
+                <input type="text" id="compare-symbols" placeholder="e.g., AAPL,MSFT,GOOGL">
+            </div>
+            <div class="form-group">
+                <label for="compare-metrics">Metrics:</label>
+                <select id="compare-metrics" multiple>
+                    <option value="performance" selected>Performance</option>
+                    <option value="valuation" selected>Valuation</option>
+                    <option value="growth">Growth</option>
+                    <option value="risk">Risk</option>
+                </select>
+                <small style="color: #888;">Hold Ctrl/Cmd to select multiple</small>
+            </div>
+            <button onclick="compareStocks()">Compare</button>
+            <div id="compare-result" class="result-box" style="display: none;"></div>
+        </div>
+
+        <!-- Portfolio Analysis Section -->
+        <div class="api-section">
+            <h2>💼 Portfolio Analysis</h2>
+            <div class="form-group">
+                <label for="portfolio-holdings">Holdings (JSON format):</label>
+                <textarea id="portfolio-holdings" rows="6" placeholder='[
+  {"symbol": "AAPL", "quantity": 10, "purchase_price": 150.0},
+  {"symbol": "MSFT", "quantity": 5, "purchase_price": 300.0},
+  {"symbol": "GOOGL", "quantity": 3, "purchase_price": 2500.0}
+]'></textarea>
+            </div>
+            <button onclick="analyzePortfolio()">Analyze Portfolio</button>
+            <div id="portfolio-result" class="result-box" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000';
+
+        // Check API status on load
+        window.onload = function() {
+            checkApiStatus();
+        };
+
+        async function checkApiStatus() {
+            const statusDiv = document.getElementById('api-status');
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                if (response.ok) {
+                    statusDiv.textContent = '✅ API is online and healthy';
+                    statusDiv.className = 'api-status online';
+                } else {
+                    statusDiv.textContent = '⚠️ API is responding but may have issues';
+                    statusDiv.className = 'api-status offline';
+                }
+            } catch (error) {
+                statusDiv.textContent = '❌ API is offline or unreachable';
+                statusDiv.className = 'api-status offline';
+            }
+        }
+
+        async function checkHealth() {
+            const resultDiv = document.getElementById('health-result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<div class="loading">Checking health...</div>';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                const data = await response.json();
+                
+                resultDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function clearCache() {
+            const resultDiv = document.getElementById('health-result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<div class="loading">Clearing analysis cache...</div>';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/v1/analysis/clear-cache`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<div class="success">✅ Cache cleared successfully!</div>
+                        <div style="margin-top: 10px;">
+                            <strong>Keys cleared:</strong> ${data.keys_cleared}<br>
+                            <strong>Message:</strong> ${data.message}<br>
+                            <small style="color: #888;">All cached analyses will now be regenerated with fresh data.</small>
+                        </div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Failed to clear cache: ${data.detail || 'Unknown error'}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error clearing cache: ${error.message}</div>`;
+            }
+        }
+
+        async function searchStocks() {
+            const query = document.getElementById('search-query').value;
+            const market = document.getElementById('search-market').value;
+            const resultDiv = document.getElementById('search-result');
+
+            if (!query.trim()) {
+                alert('Please enter a search query');
+                return;
+            }
+
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<div class="loading">Searching...</div>';
+
+            try {
+                const url = new URL(`${API_BASE_URL}/api/v1/stocks/search`);
+                url.searchParams.append('query', query);
+                url.searchParams.append('market', market);
+                url.searchParams.append('limit', '10');
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.results && data.results.length > 0) {
+                    let html = '<div class="success">Found ' + data.results.length + ' results:</div>';
+                    data.results.forEach(stock => {
+                        html += `<div style="margin: 10px 0; padding: 10px; background: #222; border-radius: 4px;">
+                            <strong>${stock.symbol}</strong> - ${stock.name} 
+                            <span style="color: #888;">(${stock.market})</span>
+                            ${stock.sector ? `<br><small>Sector: ${stock.sector}</small>` : ''}
+                        </div>`;
+                    });
+                    resultDiv.innerHTML = html;
+                } else {
+                    resultDiv.innerHTML = '<div class="error">No results found</div>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function getStockData() {
+            const symbol = document.getElementById('stock-symbol').value;
+            const market = document.getElementById('stock-market').value;
+            const period = document.getElementById('stock-period').value;
+            const resultDiv = document.getElementById('stock-result');
+
+            if (!symbol.trim()) {
+                alert('Please enter a stock symbol');
+                return;
+            }
+
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<div class="loading">Fetching stock data...</div>';
+
+            try {
+                const url = new URL(`${API_BASE_URL}/api/v1/stocks/${symbol}`);
+                url.searchParams.append('market', market);
+                url.searchParams.append('period', period);
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Cache status indicator
+                    let cacheStatus = '';
+                    if (data.cache_info) {
+                        const isFromCache = data.cache_info.is_cached;
+                        cacheStatus = `<div style="margin-bottom: 10px; padding: 8px; border-radius: 4px; background: ${isFromCache ? 'rgba(255, 152, 0, 0.2)' : 'rgba(76, 175, 80, 0.2)'}; color: ${isFromCache ? '#ff9800' : '#4CAF50'}; font-size: 12px;">
+                            <strong>${isFromCache ? '📋 CACHED' : '🔄 FRESH'}:</strong> ${data.cache_info.message}
+                        </div>`;
+                    }
+                    
+                    let html = `${cacheStatus}<div class="success">Stock Data for ${data.symbol}:</div>`;
+                    html += `<div style="margin: 10px 0;">
+                        <strong>Company:</strong> ${data.company_name}<br>
+                        <strong>Current Price:</strong> $${data.current_price.toFixed(2)} ${data.currency}<br>
+                        <strong>Change:</strong> <span style="color: ${data.change_percent >= 0 ? '#4CAF50' : '#f44336'}">${data.change_percent >= 0 ? '+' : ''}${data.change_percent.toFixed(2)}%</span><br>
+                        <strong>Volume:</strong> ${data.volume?.toLocaleString() || 'N/A'}<br>
+                        <strong>Market Cap:</strong> ${data.market_cap ? '$' + (data.market_cap / 1e9).toFixed(2) + 'B' : 'N/A'}<br>
+                        <strong>P/E Ratio:</strong> ${data.pe_ratio ? data.pe_ratio.toFixed(2) : 'N/A'}<br>
+                        <strong>Dividend Yield:</strong> ${data.dividend_yield ? (data.dividend_yield > 1 ? data.dividend_yield.toFixed(2) + '%' : (data.dividend_yield * 100).toFixed(2) + '%') : 'N/A'}<br>
+                        <strong>52W High/Low:</strong> ${data.fifty_two_week_high ? '$' + data.fifty_two_week_high.toFixed(2) : 'N/A'} / ${data.fifty_two_week_low ? '$' + data.fifty_two_week_low.toFixed(2) : 'N/A'}<br>
+                        <strong>Avg Volume:</strong> ${data.average_volume?.toLocaleString() || 'N/A'}
+                    </div>`;
+                    
+                    // Show price changes if available
+                    if (data.price_changes && Object.keys(data.price_changes).length > 0) {
+                        html += '<div style="margin: 10px 0;"><strong>Price Changes:</strong><br>';
+                        for (const [period, change] of Object.entries(data.price_changes)) {
+                            html += `<span style="margin-right: 15px;">${period}: <span style="color: ${change >= 0 ? '#4CAF50' : '#f44336'}">${change >= 0 ? '+' : ''}${change.toFixed(2)}%</span></span>`;
+                        }
+                        html += '</div>';
+                    }
+                    
+                    html += `<details><summary>Full Data (Click to expand)</summary><pre>${JSON.stringify(data, null, 2)}</pre></details>`;
+                    resultDiv.innerHTML = html;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">Error: ${data.detail || 'Failed to fetch stock data'}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function getAnalysis() {
+            const symbol = document.getElementById('analysis-symbol').value;
+            const market = document.getElementById('analysis-market').value;
+            const analysisType = document.getElementById('analysis-type').value;
+            const resultDiv = document.getElementById('analysis-result');
+
+            if (!symbol.trim()) {
+                alert('Please enter a stock symbol');
+                return;
+            }
+
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<div class="loading">Generating AI analysis... This may take a moment.</div>';
+
+            try {
+                const url = new URL(`${API_BASE_URL}/api/v1/analysis/${symbol}`);
+                url.searchParams.append('market', market);
+                url.searchParams.append('analysis_type', analysisType);
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Cache status indicator for AI analysis
+                    let cacheStatus = '';
+                    if (data.cache_info) {
+                        const isFromCache = data.cache_info.is_cached;
+                        let statusText = data.cache_info.message;
+                        if (!isFromCache && data.cache_info.tokens_used) {
+                            statusText += ` (Used ${data.cache_info.tokens_used} tokens, $${data.cache_info.cost_usd?.toFixed(6) || '0.000000'})`;
+                        }
+                        cacheStatus = `<div style="margin-bottom: 10px; padding: 8px; border-radius: 4px; background: ${isFromCache ? 'rgba(255, 152, 0, 0.2)' : 'rgba(76, 175, 80, 0.2)'}; color: ${isFromCache ? '#ff9800' : '#4CAF50'}; font-size: 12px;">
+                            <strong>${isFromCache ? '📋 CACHED' : '🤖 FRESH AI'}:</strong> ${statusText}
+                        </div>`;
+                    }
+                    
+                    let html = `${cacheStatus}<div class="success">AI Analysis for ${data.symbol}:</div>`;
+                    html += `<div style="margin: 15px 0;">
+                        <div style="margin-bottom: 10px;">
+                            <span class="recommendation ${data.recommendation.toLowerCase()}">${data.recommendation}</span>
+                            <span style="margin-left: 10px;">Confidence: ${(data.confidence_score * 100).toFixed(1)}%</span>
+                        </div>
+                        <strong>Target Price:</strong> $${data.target_price}<br>
+                        <strong>Summary:</strong> ${data.analysis_summary}
+                    </div>`;
+                    
+                    if (data.key_points && data.key_points.length > 0) {
+                        html += '<div><strong>Key Points:</strong><ul>';
+                        data.key_points.forEach(point => {
+                            html += `<li style="margin: 5px 0; color: ${point.sentiment === 'positive' ? '#4CAF50' : point.sentiment === 'negative' ? '#f44336' : '#ccc'}">
+                                [${point.category.toUpperCase()}] ${point.point}
+                            </li>`;
+                        });
+                        html += '</ul></div>';
+                    }
+
+                    html += `<details style="margin-top: 15px;"><summary>Full Analysis (Click to expand)</summary><pre>${JSON.stringify(data, null, 2)}</pre></details>`;
+                    resultDiv.innerHTML = html;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">Error: ${data.detail || 'Failed to generate analysis'}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function compareStocks() {
+            const symbols = document.getElementById('compare-symbols').value;
+            const metricsSelect = document.getElementById('compare-metrics');
+            const metrics = Array.from(metricsSelect.selectedOptions).map(option => option.value);
+            const resultDiv = document.getElementById('compare-result');
+
+            if (!symbols.trim()) {
+                alert('Please enter stock symbols');
+                return;
+            }
+
+            const symbolList = symbols.split(',').map(s => s.trim()).filter(s => s);
+            if (symbolList.length < 2) {
+                alert('Please enter at least 2 symbols');
+                return;
+            }
+
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<div class="loading">Comparing stocks... This may take a moment.</div>';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/v1/analysis/compare`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        symbols: symbolList,
+                        metrics: metrics
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    let html = `<div class="success">Comparison Results - Winner: <strong>${data.winner}</strong></div>`;
+                    
+                    html += '<div style="margin: 15px 0;"><strong>Scores:</strong><ul>';
+                    data.comparison.forEach(comp => {
+                        html += `<li style="margin: 5px 0;">
+                            <strong>${comp.symbol}:</strong> ${comp.score}/10
+                            <div style="margin-left: 20px; font-size: 12px; color: #ccc;">
+                                Strengths: ${comp.strengths.join(', ')}<br>
+                                Weaknesses: ${comp.weaknesses.join(', ')}
+                            </div>
+                        </li>`;
+                    });
+                    html += '</ul></div>';
+
+                    if (data.reasoning && data.reasoning.length > 0) {
+                        html += '<div><strong>Reasoning:</strong><ul>';
+                        data.reasoning.forEach(reason => {
+                            html += `<li style="margin: 5px 0;">${reason}</li>`;
+                        });
+                        html += '</ul></div>';
+                    }
+
+                    html += `<details style="margin-top: 15px;"><summary>Full Comparison (Click to expand)</summary><pre>${JSON.stringify(data, null, 2)}</pre></details>`;
+                    resultDiv.innerHTML = html;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">Error: ${data.detail || 'Failed to compare stocks'}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function analyzePortfolio() {
+            const holdingsText = document.getElementById('portfolio-holdings').value;
+            const resultDiv = document.getElementById('portfolio-result');
+
+            if (!holdingsText.trim()) {
+                alert('Please enter portfolio holdings');
+                return;
+            }
+
+            let holdings;
+            try {
+                holdings = JSON.parse(holdingsText);
+            } catch (error) {
+                alert('Invalid JSON format for holdings');
+                return;
+            }
+
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<div class="loading">Analyzing portfolio... This may take a moment.</div>';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/v1/analysis/portfolio`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        holdings: holdings
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    let html = `<div class="success">Portfolio Analysis Results:</div>`;
+                    html += `<div style="margin: 15px 0;">
+                        <strong>Total Value:</strong> $${data.total_value.toLocaleString()}<br>
+                        <strong>Total Gain/Loss:</strong> $${data.total_gain_loss.toLocaleString()}<br>
+                        <strong>Gain/Loss %:</strong> ${data.gain_loss_percent.toFixed(2)}%<br>
+                        <strong>Risk Assessment:</strong> ${data.risk_assessment}
+                    </div>`;
+
+                    if (data.recommendations && data.recommendations.length > 0) {
+                        html += '<div><strong>Recommendations:</strong><ul>';
+                        data.recommendations.forEach(rec => {
+                            html += `<li style="margin: 5px 0;">${rec}</li>`;
+                        });
+                        html += '</ul></div>';
+                    }
+
+                    if (data.rebalancing_suggestions && data.rebalancing_suggestions.length > 0) {
+                        html += '<div><strong>Rebalancing Suggestions:</strong><ul>';
+                        data.rebalancing_suggestions.forEach(sug => {
+                            html += `<li style="margin: 5px 0;">${sug}</li>`;
+                        });
+                        html += '</ul></div>';
+                    }
+
+                    html += `<details style="margin-top: 15px;"><summary>Full Analysis (Click to expand)</summary><pre>${JSON.stringify(data, null, 2)}</pre></details>`;
+                    resultDiv.innerHTML = html;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">Error: ${data.detail || 'Failed to analyze portfolio'}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html> 
